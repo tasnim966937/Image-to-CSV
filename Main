@@ -1,0 +1,43 @@
+import numpy as np
+from osgeo import gdal
+
+# Open the image file
+ds = gdal.Open('practice.tif')
+
+# Get the number of bands and the dimensions of the image
+num_bands = ds.RasterCount
+rows = ds.RasterYSize
+cols = ds.RasterXSize
+
+# Get the geographic transform
+transform = ds.GetGeoTransform()
+
+# Extract the geographic coordinates
+lon = np.empty((rows, cols))
+lat = np.empty((rows, cols))
+for i in range(rows):
+    for j in range(cols):
+        lon[i,j], lat[i,j] = gdal.ApplyGeoTransform(transform, j, i)
+
+
+# Extract the DN values for all bands
+dn_values = np.empty((num_bands, rows, cols))
+for i in range(num_bands):
+    band = ds.GetRasterBand(i+1)
+    dn_values[i, :, :] = band.ReadAsArray()
+
+# Transpose the DN values array to have band numbers along the row
+dn_values = dn_values.transpose((1, 2, 0))
+
+# Reshape the DN values array to have shape (num_pixels, num_bands)
+dn_values = dn_values.reshape(-1, num_bands)
+
+# Create an array to store the geographic coordinates
+coords = np.column_stack((lon.ravel(), lat.ravel()))
+
+# Combine the geographic coordinates and DN values into a single array
+data = np.column_stack((coords, dn_values))
+
+# Save the data to a CSV file
+header = 'Longitude,Latitude,' + ','.join(['Band {}'.format(i+1) for i in range(num_bands)])
+np.savetxt('output.csv', data, delimiter=',', header=header, comments='')
